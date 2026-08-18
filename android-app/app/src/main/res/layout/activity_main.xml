@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <WebView
+        android:id="@+id/webView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:id="@+id/configPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:background="#181b24"
+        android:layout_gravity="top">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DSH 手机监管"
+            android:textColor="#e8eaf0"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="后台监控服务 + 任务提醒"
+            android:textColor="#9aa3b5"
+            android:textSize="13sp"
+            android:paddingTop="2dp" />
+
+        <EditText
+            android:id="@+id/inputHost"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="电脑 IP（如 192.168.1.5）"
+            android:textColor="#e8eaf0"
+            android:textColorHint="#6b7484"
+            android:inputType="text"
+            android:layout_marginTop="14dp"
+            android:background="#1f2430"
+            android:padding="10dp" />
+
+        <EditText
+            android:id="@+id/inputPort"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="网关端口（默认 8443）"
+            android:text="8443"
+            android:textColor="#e8eaf0"
+            android:textColorHint="#6b7484"
+            android:inputType="number"
+            android:layout_marginTop="8dp"
+            android:background="#1f2430"
+            android:padding="10dp" />
+
+        <EditText
+            android:id="@+id/inputToken"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="访问令牌（网关启动窗口里显示）"
+            android:textColor="#e8eaf0"
+            android:textColorHint="#6b7484"
+            android:inputType="textPassword"
+            android:layout_marginTop="8dp"
+            android:background="#1f2430"
+            android:padding="10dp" />
+
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="连接并启动后台监控"
+            android:layout_marginTop="14dp"
+            android:textColor="#ffffff"
+            android:backgroundTint="#4c8dff" />
+
+        <TextView
+            android:id="@+id/txtStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="未连接"
+            android:textColor="#e6b450"
+            android:textSize="13sp"
+            android:paddingTop="8dp" />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/btnSettings"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="10dp"
+        android:src="@android:drawable/ic_menu_manage"
+        android:background="#66000000"
+        android:contentDescription="设置" />
+</FrameLayout>

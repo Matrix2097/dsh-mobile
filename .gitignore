@@ -11,3 +11,10 @@ desktop.ini
 # 本地临时/调试
 *.tmp
 debug-*.mjs
+
+# Android 构建产物
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+*.apk

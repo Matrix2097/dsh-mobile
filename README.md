@@ -1,35 +1,65 @@
-# DSH 手机监管网关（dsh-mobile）
+# DSH 手机监管（DSH Monitor）
 
-局域网内用手机实时监管电脑上的 **DeepSeek Harness**：任务进度实时监控、流式对话、模型/权限切换、任务完成/审批/出错提醒、只读可视化浏览电脑文件系统。
+在手机上实时监管电脑上的 **DeepSeek Harness**：任务进度实时监控、流式对话、模型/权限切换、任务完成/审批/出错提醒、只读可视化浏览电脑文件系统。支持 **PWA（浏览器）** 与 **Android App（常驻后台）** 两种形态。
 
-零外部依赖：纯 Node.js（≥21，内置 fetch/WebSocket），无需 npm install，无需 Tailscale（局域网直连）。
+零外部依赖：网关为纯 Node.js（≥21，内置 fetch/WebSocket），无需 npm install；Android App 零第三方库（原生 WebView + 前台服务）。
+
+## 功能特性
+
+| 能力 | 说明 |
+|---|---|
+| 实时监控 | 会话/任务进度秒级实时（SSE 推送，非轮询） |
+| 流式对话 | agent 思考/回复逐字流式显示，思考与工具调用折叠 |
+| 消息交互 | 输入框发消息、纠正模式（steer 打断引导） |
+| Slash 命令 | 输入框 `/` 开头自动走命令通道（`/goal` `/permission` `/compact` 等） |
+| 模型切换 | 多模型/多 provider 下拉切换，即时生效 |
+| 权限切换 | 只读 / 工作区可写 / 完全访问，实时生效（命令通道） |
+| 审批应答 | 需要授权时一键同意/拒绝 |
+| 任务提醒 | 任务完成/失败、需要授权、Agent 出错 → 系统通知 |
+| **后台常驻** | Android App 前台服务：锁屏/后台仍保持连接并推送通知 |
+| 文件浏览 | 只读白名单目录、文本预览、下载到手机 |
+| 外观主题 | 深色/浅色两档 |
 
 ## 架构
 
 ```
-手机 PWA（添加到主屏幕）         电脑
-┌────────────────────┐         ┌──────────────────────────────┐
-│ 状态 / 会话 / 文件 / │◄────────►│ 网关 server.js (0.0.0.0:8443) │
-│ 设置 四页 + 详情页   │  局域网   │  ├─ PWA 静态页面              │
-│ SSE 实时 + 系统通知  │  直连    │  ├─ 事件泵：DSH 实时事件流     │
-└────────────────────┘         │  ├─ /fs 只读文件服务（白名单） │
-                               │  └─ RPC：审批/中断/发消息/模型/  │
-                               │      权限命令                   │
-                               │             │ 127.0.0.1:动态端口 │
-                               │        DSH Desktop /api        │
-                               └──────────────────────────────┘
+┌──────────── 手机 ────────────┐        ┌──────────── 电脑 ────────────┐
+│  Android App / 浏览器 PWA     │        │                             │
+│  ├─ WebView/PWA 界面          │        │  网关 server.js (0.0.0.0:8443)│
+│  ├─ 前台服务（后台连接+通知）   │◄──────►│  ├─ PWA 静态页面              │
+│  └─ SSE 实时推送              │ 局域网/  │  ├─ 事件泵：DSH 实时事件流     │
+└─────────────────────────────┘ Tailscale│  ├─ /fs 只读文件服务（白名单） │
+                                          │  └─ RPC：命令/模型/权限/审批    │
+                                          │             │ 127.0.0.1:动态端口 │
+                                          │        DSH Desktop /api        │
+                                          └──────────────────────────────┘
 ```
 
 - 网关以「回环客户端」身份连接 DSH 的 `/api`（HTTP RPC + `events.mux`/`events.host` 双 WebSocket 事件流），自动探测 DSH 当前端口（桌面 profile 端口是动态分配的）。
-- 手机通过局域网 IP 访问网关，带访问令牌保护；DSH 本身保持 127.0.0.1 不变。
+- 手机通过局域网 IP（或 Tailscale 虚拟网）访问网关，访问令牌保护；DSH 本身保持 127.0.0.1 不变。
+
+## 目录结构
+
+```
+dsh-mobile/
+├── server.js            # 网关主程序（HTTP + SSE + /fs + 状态聚合 + RPC 代理）
+├── dsh.js               # DSH /api 协议客户端（RPC + 事件流 + 端口探测 + 重连）
+├── start-gateway.ps1    # 一键启动（端口探测/防火墙/占用检查）
+├── start-gateway.bat    # 双击入口
+├── package.json         # 零依赖
+├── public/              # PWA 前端（index.html / app.js / style.css / sw.js / manifest / 图标）
+└── android-app/         # Android App（WebView 壳 + 前台服务）
+    ├── app/src/main/java/com/matrix/dshmonitor/
+    │   ├── MainActivity.kt      # 配置 + WebView（自动注入配置到 PWA）
+    │   └── MonitorService.kt    # 前台服务：SSE 长连接 + 任务通知
+    └── app/src/main/res/        # 布局 / 主题 / 图标
+```
 
 ## 快速开始
 
-### 电脑端
+### 1. 启动网关（电脑端）
 
-双击 `start-gateway.bat`（或 `powershell -ExecutionPolicy Bypass -File start-gateway.ps1`）。
-
-脚本自动：
+双击 `start-gateway.bat`，脚本自动：
 1. 检查端口占用（旧实例未关会红字提示）
 2. 添加防火墙入站规则（首次需管理员）
 3. 探测 DSH Desktop 当前监听端口
@@ -44,56 +74,54 @@
 | `--root` | `C:\Users\Lenovo\Desktop` | 文件白名单根目录（或环境变量 `GATEWAY_ROOT`） |
 | `--token` | 随机生成 | 访问令牌；`--no-token` 关闭（不推荐） |
 
-### 手机端
+### 2. 手机连接
 
-1. 手机连接**同一局域网**（同一 WiFi）
-2. 浏览器打开 `http://<电脑IP>:8443/`
-3. 设置页填写：电脑 IP、网关端口（8443）、访问令牌（网关窗口显示）
-4. 点「一键连接」→ 自动记住配置，下次自动连接
-5. 浏览器「添加到主屏幕」→ 全屏 App 体验
-6. 设置页「开启任务提醒」→ 授权系统通知
+**PWA 方式**（任何手机）：手机连同一局域网 → 浏览器打开 `http://<电脑IP>:8443/` → 设置页填 IP/端口/令牌 → 一键连接 → 添加到主屏幕。
 
-## 功能
+**Android App**（推荐，支持后台提醒）：见下文。
 
-### 状态页
-- DSH 版本 / 模型 / 端口 / 会话数
-- 运行中的 Agent 卡片（任务 jobs 进度；无运行时显示最近活跃会话）
-- 待处理审批（🔐 一键同意/拒绝）与提问（❓）
+### 3. 任务提醒
 
-### 会话页 / 详情页
-- 全部会话列表（运行状态、目录、preset、jobs 状态），点击进入详情
-- **流式消息流**：思考过程（折叠）、正文逐字流式、工具调用+结果折叠条、实时心跳指示
-- **聊天交互**：输入框发消息（Enter 发送），可切换「纠正模式」（steer 立即打断引导当前任务）
-- **模型切换**：下拉选择（DeepSeek 官方 / modlens 视觉，v4-flash / v4-pro）
-- **权限切换**：🔒只读 / 📝工作区可写 / ⚠️完全访问（完全访问有确认弹窗），实时生效并高亮
+- **PWA**：设置页「开启任务提醒」（仅 App 前台有效）
+- **Android App**：前台服务常驻，锁屏/后台也能推送
 
-### 文件页
-- 只读浏览白名单目录、面包屑导航、文本预览（≤512KB）、下载到手机
+## Android App
 
-### 通知（前台有效）
-- 任务完成/失败、需要授权、Agent 提问、Agent 出错 → 系统通知（同类合并防刷屏）
-- 连接状态/授权结果只记录事件日志，不弹通知
+### 构建 APK（命令行，无需 Android Studio）
 
-### 设置页
-- 连接配置（IP/端口/令牌，自动重连）
-- 通知权限状态 + 开启按钮
-- 事件日志（折叠，调试用）
+前置：JDK 17+、Android SDK（platform 34 + build-tools 34）、Gradle 8.10+。
 
-## API（手机端 PWA 使用）
+```bash
+# 在 android-app/ 下创建 local.properties 指定 SDK 路径：
+#   sdk.dir=C\:\\path\\to\\android-sdk
+gradle assembleDebug
+# 产物：app/build/outputs/apk/debug/app-debug.apk
+```
+
+### 安装与使用
+
+1. 将 `app-debug.apk` 传到手机安装（允许"未知来源"）
+2. 首次打开：填电脑 IP / 端口 / 令牌 → 「连接并启动后台监控」
+3. 配置自动注入 PWA，界面直接可用；右上角 ⚙️ 可随时改配置
+4. 通知栏出现"DSH 监控运行中" = 后台服务运行中，锁屏也能收到任务通知
+
+注意：部分国产 ROM（小米/华为等）默认限制后台，请在系统设置中允许该 App 后台运行/自启动。
+
+## API（PWA 与 Android 共用）
 
 | 端点 | 说明 |
 |---|---|
 | `GET /api/state` | 聚合状态快照（会话/jobs/审批/事件） |
 | `GET /api/stream?token=` | SSE 实时推送（snapshot + 事件帧 + 通知） |
-| `GET /api/history?sessionId=` | 会话消息流（服务端过滤增量帧，消息级事件） |
+| `GET /api/history?sessionId=` | 会话消息流（服务端过滤增量帧） |
 | `GET /api/models?sessionId=` | 模型列表与当前选择 |
 | `POST /api/select-model` | 切换模型 `{sessionId, provider, model}` |
-| `POST /api/permission` | 切换工作模式 `{sessionId, mode}`（走 commands/execute） |
+| `POST /api/permission` | 切换工作模式 `{sessionId, mode}` |
 | `POST /api/approval` | 审批应答 `{approvalId, outcome}` |
 | `POST /api/interrupt` | 中断会话 `{sessionId}` |
-| `POST /api/prompt` | 发消息 `{sessionId, content, mode?}`（queue/steer） |
-| `POST /api/commands` | 会话支持的命令列表 `{sessionId}` |
-| `GET /fs/list?path=` / `GET /fs/read?path=` / `GET /fs/download?path=` | 只读文件服务 |
+| `POST /api/prompt` | 发消息 `{sessionId, content, mode?}`（`/` 开头自动转命令） |
+| `POST /api/command` | 执行 slash 命令 `{sessionId, line}` |
+| `GET /fs/list` / `GET /fs/read` / `GET /fs/download` | 只读文件服务 |
 
 认证：`X-Gateway-Token` 请求头（SSE 用 `?token=`）。
 
@@ -101,34 +129,22 @@
 
 - 网关绑定 0.0.0.0，**局域网内任何人拿到令牌即可完全控制 DSH**（令牌默认随机生成，仅显示在启动窗口）。
 - 文件服务**只读**且限制在 `--root` 白名单内。
-- 不要在不受信任的网络上运行。
-- 通知仅前台有效：浏览器切后台/锁屏后标签页会被挂起，提醒丢失；后台通知需 HTTPS + Web Push 或原生壳（见下）。
+- 不要在不受信任的网络上运行；远程访问建议走 Tailscale（设备认证 + 加密）。
+- DSH 本身没有认证层，令牌是唯一防线。
 
-## 已知限制 / 后续
+## 已知限制
 
-- **后台通知**：局域网 HTTP PWA 无法后台驻留；升级路线为 HTTPS（自签证书）+ Web Push（Android 可行）或 TWA 原生壳
-- **提问应答**：`question/requested` 提醒已显示，但手机上直接回答的功能尚未接入（可走消息输入框回复）
-- 事件日志默认折叠，展开可看调试信息
-
-## 目录结构
-
-```
-dsh-mobile/
-├── server.js            # 网关主程序（HTTP + SSE + /fs + 状态聚合 + RPC 代理）
-├── dsh.js               # DSH /api 协议客户端（RPC + 事件流 + 端口探测 + 重连）
-├── start-gateway.ps1    # 一键启动（端口探测/防火墙/占用检查）
-├── start-gateway.bat    # 双击入口
-├── package.json         # 零依赖
-└── public/              # PWA 前端（index.html / app.js / style.css / sw.js / manifest / 图标）
-```
+- **PWA 通知仅前台有效**（浏览器挂起后台标签页）；后台提醒请用 Android App
+- 提问（ask_user_question）有提醒但暂未支持手机上直接回答
+- 依赖 DSH 运行时接口（非官方稳定 API），DSH 大版本升级后可能需要小幅适配
 
 ## 逆向的 DSH 协议要点（备忘）
 
 - RPC：`POST /api/<method>`，信封 `{type:"client-request", rpcId, method, payload}` → `{type:"server-response", rpcId, result:{ok,value|error}}`
-- 端点域是**单数**：`session.list`、`session.prompt`、`session.history`、`session.interrupt`、`session.models`、`session.selectModel`、`workspace.list`、`commands/execute`
+- 端点域是**单数**：`session.list`、`session.prompt`、`session.history`、`session.interrupt`、`session.models`、`session.selectModel`、`workspace.list`
 - Typert 端点：`namespace/method` 斜杠命名 + payload 需 `{args:{...}}` 包装（如 `commands/execute` 的 `{args:{agentId, line}}`）
 - 事件流：`ws://127.0.0.1:port/api/events.mux`（会话事件）+ `/api/events.host`（全局状态）；帧 = `{type:"server-request", rpcId, method, payload}`
 - 流式增量帧：`assistant/chunk` 含 `block-start` / `reasoning-delta` / `text-delta` / `tool-call-delta` / `block-end`
 - 审批应答：`POST /api/respond` + `{type:"client-response", rpcId:<请求的rpcId>, result:{ok:true, value:{sessionId, approvalId, outcome}}}`
-- 权限切换：`commands/execute` 执行 `/permission <mode>` slash 命令（GUI 同机制，不进模型上下文）
-- 用户消息会以 `user/message` 与 `agent/inbox/spliced` 双形态落库（渲染需按 id 去重）
+- 权限切换：`commands/execute` 执行 `/permission <mode>` slash 命令（不进模型上下文）
+- 用户消息以 `user/message` 与 `agent/inbox/spliced` 双形态落库（渲染需按 id 去重）；插件注入的 `role:"user"` 上下文消息需按 `source.kind` 过滤
