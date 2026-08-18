@@ -55,6 +55,41 @@ dsh-mobile/
     └── app/src/main/res/        # 布局 / 主题 / 图标
 ```
 
+## 使用前置条件
+
+### 电脑端（运行网关）
+
+| 条件 | 说明 |
+|---|---|
+| 操作系统 | Windows 10/11（一键脚本为 PowerShell/.bat；其他系统需手动运行 `node server.js`） |
+| Node.js | **≥ 21**（网关依赖内置 fetch/WebSocket；零 npm 依赖，无需 `npm install`） |
+| DSH | 已安装并正在运行的 **DSH Desktop**（或 `dsh web`，端口需手动指定） |
+| 防火墙 | 入站 TCP 8443 放行（`start-gateway.bat` 首次运行自动添加，需管理员一次） |
+
+### 手机端（查看与交互）
+
+| 形态 | 条件 |
+|---|---|
+| **PWA** | Android Chrome / iOS Safari 14+；同一局域网可访问电脑 IP；「任务提醒」需授予通知权限（仅前台有效） |
+| **Android App** | Android 8.0+（minSdk 26）；安装 APK 需允许"未知来源"；部分国产 ROM 需在系统设置允许后台运行 |
+
+### 网络
+
+| 场景 | 要求 |
+|---|---|
+| 局域网使用 | 手机与电脑**同一 WiFi/网段**，能互通即可（无需公网 IP） |
+| 远程使用（可选） | 手机与电脑均安装 **Tailscale**（同一账号），App 中电脑 IP 填 Tailscale 分配的 `100.x.x.x` 地址 |
+
+### 仅构建 Android App 时需要（进阶）
+
+| 工具 | 版本 |
+|---|---|
+| JDK | 17+ |
+| Android SDK | platform 34 + build-tools 34（命令行 `sdkmanager` 或 Android Studio 均可） |
+| Gradle | 8.10+（或使用项目自带 wrapper） |
+
+> 日常使用**不需要**任何这些开发工具——只有你想自己重新打包 APK 时才需要。
+
 ## 快速开始
 
 ### 1. 启动网关（电脑端）
