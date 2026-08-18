@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1117" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <title>DSH 监管</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">DSH <span>监管</span></div>
+    <div id="conn-badge" class="badge badge-off">未连接</div>
+  </header>
+
+  <main id="view-status" class="view">
+    <section class="card" id="dsh-overview">
+      <div class="card-title">DSH 状态</div>
+      <div class="kv"><span>运行端口</span><b id="ov-port">—</b></div>
+      <div class="kv"><span>版本</span><b id="ov-version">—</b></div>
+      <div class="kv"><span>工作目录</span><b id="ov-cwd" class="mono small">—</b></div>
+      <div class="kv"><span>模型</span><b id="ov-model">—</b></div>
+      <div class="kv"><span>会话数</span><b id="ov-sessions">—</b></div>
+    </section>
+
+    <section class="card" id="pending-card" hidden>
+      <div class="card-title">待处理</div>
+      <div id="pending-list"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">运行中的 Agent</div>
+      <div id="running-list"><div class="empty">暂无运行中的会话</div></div>
+    </section>
+  </main>
+
+  <main id="view-sessions" class="view" hidden>
+    <section class="card">
+      <div class="card-title">全部会话</div>
+      <div id="session-list"></div>
+    </section>
+  </main>
+
+  <main id="view-detail" class="view view-fill" hidden>
+    <section class="card card-fill">
+      <div class="card-title">
+        <span id="detail-title">会话</span>
+        <button id="detail-back" class="btn small">返回</button>
+      </div>
+      <div id="detail-meta" class="hint"></div>
+      <div id="detail-live" class="live-indicator">● 实时：等待事件…</div>
+      <div id="detail-messages" class="msg-scroll"><div class="empty">加载中…</div></div>
+      <div class="composer">
+        <div class="composer-row">
+          <input id="composer-input" type="text" placeholder="给 agent 发消息…（Enter 发送）" autocomplete="off" />
+          <button id="composer-send" class="btn primary">发送</button>
+        </div>
+        <label class="composer-mode"><input type="checkbox" id="composer-steer" /> 纠正模式：立即打断并引导当前任务（steer）</label>
+        <button id="tools-toggle" class="tools-toggle" type="button">⚙️ 模型与权限 ▾</button>
+      </div>
+      <div id="detail-tools" hidden>
+        <div class="tool-row">
+          <span class="tool-label">模型</span>
+          <select id="detail-model" class="tool-select"><option>加载中…</option></select>
+        </div>
+        <div class="tool-row">
+          <span class="tool-label">权限</span>
+          <div id="detail-perm" class="perm-chips">
+            <button class="perm-chip" data-mode="read-only">🔒 只读</button>
+            <button class="perm-chip" data-mode="workspace-write">📝 工作区</button>
+            <button class="perm-chip" data-mode="danger-full-access">⚠️ 完全访问</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <main id="view-files" class="view" hidden>
+    <section class="card">
+      <div class="card-title">
+        <span id="fs-crumb">文件系统</span>
+        <button id="fs-home" class="btn small">根目录</button>
+      </div>
+      <div id="fs-list"><div class="empty">加载中…</div></div>
+      <pre id="fs-preview" class="mono" hidden></pre>
+    </section>
+  </main>
+
+  <main id="view-settings" class="view" hidden>
+    <section class="card">
+      <div class="card-title">连接设置</div>
+      <label>电脑 IP（局域网）<input id="cfg-host" type="text" placeholder="192.168.1.100" /></label>
+      <label>网关端口<input id="cfg-port" type="number" value="8443" /></label>
+      <label>访问令牌<input id="cfg-token" type="password" placeholder="网关启动时显示的令牌" /></label>
+      <button id="btn-connect" class="btn primary">一键连接</button>
+      <div id="conn-result" class="hint"></div>
+      <div class="hint">令牌显示在电脑网关启动窗口里；连接成功后会记住配置，下次打开自动连接。</div>
+    </section>
+    <section class="card">
+      <div class="card-title">外观主题</div>
+      <div id="bg-picker" class="bg-options">
+        <button class="bg-option" data-bg="default">🌙 深色</button>
+        <button class="bg-option" data-bg="light">☀️ 浅色</button>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-title">通知</div>
+      <button id="btn-notify" class="btn">开启任务提醒</button>
+      <div id="notify-status" class="hint">检查通知权限中…</div>
+      <div class="hint">任务完成 / 需要授权 / Agent 出错时弹系统通知（仅 App 在前台或浏览器打开时有效）。</div>
+    </section>
+    <section class="card">
+      <div class="card-title">事件日志（调试用）</div>
+      <details class="collapse">
+        <summary>点击展开最近事件</summary>
+        <div class="collapse-body"><div id="event-log" class="mono small"></div></div>
+      </details>
+    </section>
+  </main>
+
+  <nav id="tabbar">
+    <button data-view="view-status" class="tab active">状态</button>
+    <button data-view="view-sessions" class="tab">会话</button>
+    <button data-view="view-files" class="tab">文件</button>
+    <button data-view="view-settings" class="tab">设置</button>
+  </nav>
+
+  <div id="toast" hidden></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
