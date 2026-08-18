@@ -47,7 +47,7 @@ dsh-mobile/
 ├── start-gateway.ps1    # 一键启动（端口探测/防火墙/占用检查）
 ├── start-gateway.bat    # 双击入口
 ├── package.json         # 零依赖
-├── public/              # PWA 前端（index.html / app.js / style.css / sw.js / manifest / 图标）
+├── public/              # PWA 前端（网关运行必需，勿删：手机访问网关时从这里加载页面）
 └── android-app/         # Android App（WebView 壳 + 前台服务）
     ├── app/src/main/java/com/matrix/dshmonitor/
     │   ├── MainActivity.kt      # 配置 + WebView（自动注入配置到 PWA）
