@@ -137,6 +137,13 @@ class MainActivity : Activity() {
     }
 
     override fun onBackPressed() {
-        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+        // 先问 PWA 有没有上一级界面（详情页/展开面板），没有才退出 App
+        webView.evaluateJavascript("(window.__dshBack ? window.__dshBack() : 'exit')") { result ->
+            val v = result?.trim('"')
+            if (v == null || v == "exit") {
+                super.onBackPressed()
+            }
+            // "handled"：PWA 已处理返回，什么都不做
+        }
     }
 }

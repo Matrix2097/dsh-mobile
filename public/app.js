@@ -805,14 +805,28 @@ $("btn-connect").addEventListener("click", () => {
 });
 $("btn-notify").addEventListener("click", enableNotifications);
 $("fs-home").addEventListener("click", () => fsOpen(""));
-$("detail-back").addEventListener("click", () => {
+/** 关闭会话详情，回到会话列表 */
+function closeDetail() {
   detailClosed = true;
   currentDetail = null;
   if (streamTimer) { clearTimeout(streamTimer); streamTimer = null; }
   if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; }
   document.querySelectorAll(".view").forEach((v) => (v.hidden = true));
   $("view-sessions").hidden = false;
-});
+}
+
+/** Android App 返回键处理：PWA 有上一级界面则处理，否则返回 "exit" 让 App 退出 */
+window.__dshBack = function () {
+  // 1) 模型/权限面板展开中 → 先收起
+  const tools = $("detail-tools");
+  if (tools && !tools.hidden) { toggleTools(false); return "handled"; }
+  // 2) 会话详情打开中 → 回会话列表
+  if (currentDetail && !$("view-detail").hidden) { closeDetail(); return "handled"; }
+  // 3) 无更上级界面 → 交给 App 退出
+  return "exit";
+};
+
+$("detail-back").addEventListener("click", closeDetail);
 $("composer-send").addEventListener("click", sendMessage);
 $("composer-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
