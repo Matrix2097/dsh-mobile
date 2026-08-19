@@ -688,6 +688,8 @@ async function interruptSession(sessionId) {
 }
 
 // ---------- 文件浏览 ----------
+let fsEntries = []; // 当前列表缓存（供复制路径用）
+
 async function fsOpen(p) {
   if (!api) return;
   fsPath = p || "";
@@ -698,21 +700,30 @@ async function fsOpen(p) {
     const res = await fetch(`${api.base}/fs/list?path=${encodeURIComponent(fsPath)}`, { headers: { "x-gateway-token": api.token } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    $("fs-crumb").textContent = data.path || "文件系统";
-    list.innerHTML = data.entries.length
-      ? data.entries.map((e) => `<div class="fs-row" onclick="fsTap(${JSON.stringify(e.name).replace(/"/g, "&quot;")})">
-          <span class="fs-icon ${e.type === "dir" ? "fs-dir" : ""}">${e.type === "dir" ? "📁" : "📄"}</span>
-          <span class="fs-name">${esc(e.name)}</span>
+    fsEntries = data.entries ?? [];
+    $("fs-crumb").textContent = data.path || (data.drives ? "全部磁盘" : "文件系统");
+    $("fs-crumb").title = data.path || "";
+    list.innerHTML = fsEntries.length
+      ? fsEntries.map((e, i) => `<div class="fs-row" onclick="fsTap(${i})">
+          <span class="fs-icon ${e.type === "dir" ? "fs-dir" : ""}">${e.drive ? "💽" : e.type === "dir" ? "📁" : "📄"}</span>
+          <span class="fs-name">${esc(e.drive ? e.name : e.name)}</span>
           <span class="fs-size">${e.type === "dir" ? "" : fmtSize(e.size)}</span>
+          <span class="fs-row-btns">
+            ${e.type === "file" ? `<button class="fs-copy" onclick="event.stopPropagation(); fsDownload(${i})" title="下载到手机">⬇</button>` : ""}
+            <button class="fs-copy" onclick="event.stopPropagation(); fsCopyPath(${i})" title="复制完整路径">📋</button>
+          </span>
         </div>`).join("")
       : `<div class="empty">空目录</div>`;
   } catch (err) {
+    fsEntries = [];
     list.innerHTML = `<div class="empty">加载失败：${esc(err.message)}</div>`;
   }
 }
 
-async function fsTap(name) {
-  const target = fsPath ? fsPath.replace(/[\\/]+$/, "") + "\\" + name : name;
+async function fsTap(i) {
+  const e = fsEntries[i];
+  if (!e) return;
+  const target = e.drive ? e.name : fsPath ? fsPath.replace(/[\\/]+$/, "") + "\\" + e.name : e.name;
   try {
     const res = await fetch(`${api.base}/fs/list?path=${encodeURIComponent(target)}`, { headers: { "x-gateway-token": api.token } });
     if (res.ok) { fsOpen(target); return; }
@@ -734,10 +745,78 @@ async function fsTap(name) {
   }
 }
 
-function fsDownload(name) {
+function fsDownload(i) {
   if (!api) return;
-  const target = fsPath ? fsPath.replace(/[\\/]+$/, "") + "\\" + name : name;
+  const e = fsEntries[i];
+  if (!e || e.type !== "file") return;
+  const target = e.drive ? e.name : fsPath ? fsPath.replace(/[\\/]+$/, "") + "\\" + e.name : e.name;
   window.open(`${api.base}/fs/download?path=${encodeURIComponent(target)}&token=${encodeURIComponent(api.token)}`, "_blank");
+}
+
+/** 复制某个条目/当前目录的完整路径到剪贴板 */
+async function fsCopyPath(i) {
+  if (!api) return;
+  const e = fsEntries[i];
+  if (!e) return;
+  const target = e.drive ? e.name : fsPath ? fsPath.replace(/[\\/]+$/, "") + "\\" + e.name : e.name;
+  await copyText(target);
+}
+
+async function fsCopyCurrent() {
+  if (!api) return;
+  const p = $("fs-crumb").title || fsPath;
+  if (!p) { toast("当前在磁盘列表，请先进入目录"); return; }
+  await copyText(p);
+}
+
+/** 复制文本到剪贴板（兼容非 https 的局域网环境） */
+async function copyText(txt) {
+  const fallback = () => {
+    const ta = document.createElement("textarea");
+    ta.value = txt;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand("copy"); } catch { /* noop */ }
+    document.body.removeChild(ta);
+  };
+  try {
+    if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(txt);
+    else fallback();
+    toast("✅ 已复制路径：" + txt);
+  } catch {
+    fallback();
+    toast("已复制路径：" + txt);
+  }
+}
+
+/** 把手机上选择的文件上传到当前目录 */
+async function fsUploadFiles(fileList) {
+  if (!api || !fileList?.length) return;
+  const dir = fsPath || "";
+  const files = [...fileList];
+  let done = 0;
+  const failCount = [];
+  for (const f of files) {
+    toast(`上传中：${f.name}…`);
+    try {
+      const res = await fetch(`${api.base}/fs/upload?dir=${encodeURIComponent(dir)}&name=${encodeURIComponent(f.name)}`, {
+        method: "POST",
+        headers: { "x-gateway-token": api.token, "x-file-name": encodeURIComponent(f.name) },
+        body: f,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      done++;
+    } catch (err) {
+      failCount.push(`${f.name}（${err.message}）`);
+    }
+  }
+  if (failCount.length === 0) toast(`✅ 上传完成：${done} 个文件`);
+  else toast(`⚠️ ${done} 成功，${failCount.length} 失败：${failCount.join("；")}`);
+  fsOpen(fsPath); // 刷新列表
 }
 
 // ---------- 外观主题（深/浅两档） ----------
@@ -805,6 +884,12 @@ $("btn-connect").addEventListener("click", () => {
 });
 $("btn-notify").addEventListener("click", enableNotifications);
 $("fs-home").addEventListener("click", () => fsOpen(""));
+$("fs-copy-path").addEventListener("click", fsCopyCurrent);
+$("fs-upload").addEventListener("click", () => $("fs-file-input").click());
+$("fs-file-input").addEventListener("change", (e) => {
+  fsUploadFiles(e.target.files);
+  e.target.value = ""; // 允许再次选择同一文件
+});
 /** 关闭会话详情，回到会话列表 */
 function closeDetail() {
   detailClosed = true;

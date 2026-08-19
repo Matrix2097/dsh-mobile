@@ -1,9 +1,9 @@
 ﻿# start-gateway.ps1 — 一键启动 DSH 手机监管网关
 # 用法：双击 start-gateway.bat，或在终端执行 .\start-gateway.ps1
-# 可选参数：-Port 8443 -Root "C:\Users\Lenovo\Desktop" -Token "自定义令牌" -DshPort 55613（手动指定 DSH 端口）
+# 可选参数：-Port 8443 -Root "C:\Users\Lenovo\Desktop"（留空=整个磁盘，默认） -Token "自定义令牌" -DshPort 55613（手动指定 DSH 端口）
 param(
     [int]$Port = 8443,
-    [string]$Root = "C:\Users\Lenovo\Desktop",
+    [string]$Root = "",
     [string]$Token = "",
     [int]$DshPort = 0
 )
@@ -75,6 +75,11 @@ if ($dshPort) {
 Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host "  DSH 手机监管网关 - 一键启动" -ForegroundColor Cyan
 Write-Host "==============================================" -ForegroundColor Cyan
+if ($Root) {
+    Write-Host ("  文件范围:  {0}（白名单）" -f $Root) -ForegroundColor Yellow
+} else {
+    Write-Host "  文件范围:  整个磁盘（全部盘符，可读 + 可上传文件到电脑）" -ForegroundColor Yellow
+}
 $ips = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
     Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" -and $_.PrefixOrigin -ne "WellKnown" }
 foreach ($ip in $ips) {
@@ -85,7 +90,8 @@ Write-Host "网关启动后显示在下方窗口中，手机连接时填写" -Fo
 Write-Host "  关闭:      关闭本窗口即可停止网关" -ForegroundColor Yellow
 Write-Host "----------------------------------------------" -ForegroundColor Cyan
 
-$nodeArgs = @("$server", "--port", "$Port", "--root", "$Root")
+$nodeArgs = @("$server", "--port", "$Port")
+if ($Root) { $nodeArgs += @("--root", "$Root") }
 if ($dshPort) { $nodeArgs += @("--dsh-port", "$dshPort") }
 if ($Token) { $nodeArgs += @("--token", "$Token") }
 

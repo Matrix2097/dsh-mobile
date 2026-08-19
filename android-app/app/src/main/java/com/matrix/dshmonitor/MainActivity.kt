@@ -4,9 +4,12 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -26,6 +29,10 @@ class MainActivity : Activity() {
     private lateinit var btnConnect: Button
     private lateinit var txtStatus: TextView
     private lateinit var webView: WebView
+
+    // WebView 文件上传（PWA「上传」按钮 → 系统文件选择器）
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private val REQ_FILE_CHOOSER = 10001
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,6 +68,25 @@ class MainActivity : Activity() {
             override fun onPageFinished(view: WebView, url: String?) {
                 // 把配置注入 PWA（localStorage），一次填写、界面自动连接
                 injectConfigToPwa()
+            }
+        }
+        // 文件上传：PWA 里点「上传」→ 系统文件选择器（需要 WebChromeClient）
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(
+                webView: WebView,
+                filePathCallback: ValueCallback<Array<Uri>>,
+                fileChooserParams: FileChooserParams
+            ): Boolean {
+                this@MainActivity.filePathCallback?.onReceiveValue(null)
+                this@MainActivity.filePathCallback = filePathCallback
+                val intent = fileChooserParams.createIntent()
+                try {
+                    startActivityForResult(intent, REQ_FILE_CHOOSER)
+                } catch (e: Exception) {
+                    this@MainActivity.filePathCallback = null
+                    filePathCallback.onReceiveValue(null)
+                }
+                return true
             }
         }
 
@@ -134,6 +160,25 @@ class MainActivity : Activity() {
             txtStatus.text = if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
                 "通知权限已开启" else "通知权限未开启（仍可监控，提醒会静默）"
         }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQ_FILE_CHOOSER) {
+            val cb = filePathCallback ?: return
+            filePathCallback = null
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                val uris = if (data.clipData != null) {
+                    (0 until data.clipData!!.itemCount).map { data.clipData!!.getItemAt(it).uri }.toTypedArray()
+                } else {
+                    data.data?.let { arrayOf(it) } ?: arrayOf()
+                }
+                cb.onReceiveValue(if (uris.isEmpty()) null else uris)
+            } else {
+                cb.onReceiveValue(null)
+            }
+            return
+        }
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     override fun onBackPressed() {

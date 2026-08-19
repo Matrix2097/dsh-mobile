@@ -2,7 +2,8 @@
 // 手机 PWA（局域网）→ 本网关 → DSH /api（回环）
 // 零依赖：node:http + Node 24 全局 fetch/WebSocket
 //
-// 用法: node server.js [--port 8443] [--dsh-port <auto>] [--root <白名单根目录>] [--token <xxx>] [--no-token]
+// 用法: node server.js [--port 8443] [--dsh-port <auto>] [--root <白名单根目录>] [--token <xxx>] [--no-token] [--max-upload-mb <MB>]
+// 默认不传 --root = 浏览整个磁盘（Windows 显示所有盘符；上传可写到任意目录）
 import http from "node:http";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -20,26 +21,29 @@ function parseArgs(argv) {
   const args = {
     port: 8443,
     dshPort: null,
-    root: process.env.GATEWAY_ROOT || "C:\\Users\\Lenovo\\Desktop",
+    root: process.env.GATEWAY_ROOT || null, // null = 整个磁盘
     token: process.env.GATEWAY_TOKEN || null,
     noToken: false,
+    maxUploadMb: 1024,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
     if (a === "--port") args.port = Number(next());
     else if (a === "--dsh-port") args.dshPort = Number(next());
-    else if (a === "--root") args.root = next();
+    else if (a === "--root") args.root = next() || null;
     else if (a === "--token") args.token = next();
     else if (a === "--no-token") args.noToken = true;
+    else if (a === "--max-upload-mb") args.maxUploadMb = Number(next()) || 1024;
   }
   if (!args.token && !args.noToken) args.token = crypto.randomBytes(6).toString("hex");
   return args;
 }
 
 const args = parseArgs(process.argv.slice(2));
-const root = path.resolve(args.root);
+const root = args.root ? path.resolve(args.root) : null;
 const token = args.token;
+const MAX_UPLOAD = args.maxUploadMb * 1024 * 1024;
 
 // ---------- 状态聚合 ----------
 const state = {
@@ -253,19 +257,44 @@ async function connectToDsh() {
   }
 }
 
-// ---------- 文件系统（只读 + 白名单） ----------
-function resolveWithinRoot(p) {
+// ---------- 文件系统（默认整个磁盘；--root 可收窄为白名单） ----------
+function resolvePath(p) {
   const abs = path.resolve(String(p ?? ""));
-  if (abs !== root && !abs.startsWith(root + path.sep)) {
+  if (root && abs !== root && !abs.startsWith(root + path.sep)) {
     throw new Error(`路径不在允许范围内: ${abs}`);
   }
   return abs;
 }
 
+/** 列出本机所有盘符（Windows）/ 根目录（POSIX） */
+async function listDrives() {
+  const drives = [];
+  if (process.platform === "win32") {
+    for (let i = 65; i <= 90; i++) {
+      const letter = String.fromCharCode(i);
+      const d = `${letter}:\\`;
+      try {
+        await fsp.access(d);
+        const st = await fsp.stat(d);
+        drives.push({ name: d, type: "dir", size: null, mtime: st.mtimeMs, drive: true });
+      } catch {
+        // 不存在的盘符，跳过
+      }
+    }
+  } else {
+    try { drives.push({ name: "/", type: "dir", size: null, mtime: null, drive: true }); } catch { /* noop */ }
+  }
+  return drives;
+}
+
 const TEXT_EXT = new Set([".txt", ".md", ".json", ".js", ".ts", ".jsx", ".tsx", ".css", ".html", ".htm", ".xml", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".log", ".csv", ".ps1", ".py", ".c", ".h", ".cpp", ".java", ".go", ".rs", ".sh", ".bat", ".cmd", ".vue", ".svelte", ".sql", ".env"]);
 
 async function fsList(p) {
-  const abs = resolveWithinRoot(p);
+  // 未限制时，空路径 = 盘符列表
+  if (!root && !String(p ?? "").trim()) {
+    return { path: "", scope: "all", drives: true, entries: await listDrives() };
+  }
+  const abs = resolvePath(p);
   const entries = await fsp.readdir(abs, { withFileTypes: true });
   const items = [];
   for (const e of entries) {
@@ -280,11 +309,11 @@ async function fsList(p) {
     } catch { /* 跳过无法访问的项 */ }
   }
   items.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === "dir" ? -1 : 1));
-  return { path: abs, entries: items };
+  return { path: abs, scope: root ? "whitelist" : "all", drives: false, entries: items };
 }
 
 async function fsRead(p) {
-  const abs = resolveWithinRoot(p);
+  const abs = resolvePath(p);
   const st = await fsp.stat(abs);
   if (!st.isFile()) throw new Error("不是文件");
   if (st.size > MAX_TEXT_READ) throw new Error(`文件过大（${st.size} 字节 > ${MAX_TEXT_READ}）`);
@@ -292,6 +321,46 @@ async function fsRead(p) {
   let content = await fsp.readFile(abs, "utf8");
   if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1); // strip BOM
   return { path: abs, size: st.size, text: content, previewable: TEXT_EXT.has(ext) };
+}
+
+/** 接收上传的原始字节流并写入目标文件（流式，不整读进内存） */
+function saveUpload(req, target, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const out = fs.createWriteStream(target, { flags: "wx" });
+    let size = 0;
+    let failed = false;
+    const fail = (msg) => {
+      if (failed) return;
+      failed = true;
+      out.destroy();
+      fs.unlink(target, () => {});
+      reject(new Error(msg));
+    };
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > maxBytes) {
+        req.unpipe(out);
+        fail(`文件过大（超过 ${args.maxUploadMb} MB 上限）`);
+      }
+    });
+    req.on("error", (e) => fail(`上传中断: ${e.message}`));
+    out.on("error", (e) => fail(`写入失败: ${e.message}`));
+    out.on("finish", () => resolve(size));
+    req.pipe(out);
+  });
+}
+
+async function fsUpload(req, dir, name) {
+  const absDir = resolvePath(dir);
+  const st = await fsp.stat(absDir);
+  if (!st.isDirectory()) throw new Error("目标不是目录");
+  // 文件名清洗：只取 basename，防止路径穿越
+  let base = String(name ?? "").replace(/[\\/]+/g, path.sep);
+  base = path.basename(base);
+  if (!base || base === "." || base === "..") throw new Error("非法文件名");
+  const target = path.join(absDir, base);
+  const size = await saveUpload(req, target, MAX_UPLOAD);
+  return { path: target, size };
 }
 
 // ---------- HTTP 服务 ----------
@@ -460,10 +529,17 @@ const server = http.createServer(async (req, res) => {
     if (p.startsWith("/fs/")) {
       if (!authOk(req)) return sendJson(res, 401, { ok: false, error: "missing or bad token" });
       try {
+        if (req.method === "POST" && p === "/fs/upload") {
+          const dir = url.searchParams.get("dir") ?? "";
+          const name = url.searchParams.get("name") ?? req.headers["x-file-name"] ?? "";
+          const r = await fsUpload(req, dir, name);
+          return sendJson(res, 200, { ok: true, path: r.path, size: r.size });
+        }
+        if (req.method !== "GET") return sendJson(res, 405, { ok: false, error: "method not allowed" });
         if (p === "/fs/list") return sendJson(res, 200, await fsList(url.searchParams.get("path") ?? ""));
         if (p === "/fs/read") return sendJson(res, 200, await fsRead(url.searchParams.get("path") ?? ""));
         if (p === "/fs/download") {
-          const abs = resolveWithinRoot(url.searchParams.get("path") ?? "");
+          const abs = resolvePath(url.searchParams.get("path") ?? "");
           const st = await fsp.stat(abs);
           if (!st.isFile()) return sendJson(res, 400, { ok: false, error: "not a file" });
           res.writeHead(200, {
@@ -517,7 +593,8 @@ console.log("==============================================");
 console.log("  DSH 手机监管网关");
 console.log("==============================================");
 console.log(`  网关监听:   0.0.0.0:${args.port}`);
-console.log(`  文件白名单: ${root}`);
+console.log(`  文件范围:   ${root ? "白名单 " + root : "整个磁盘（全部盘符，可读+可上传）"}`);
+console.log(`  上传上限:   ${args.maxUploadMb} MB/文件`);
 if (token) console.log(`  访问令牌:   ${token}   ← 手机 App 连接时填写`);
 else console.log("  访问令牌:   已禁用（局域网无保护！）");
 console.log("----------------------------------------------");

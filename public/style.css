@@ -115,6 +115,8 @@ body {
 
 /* 文件浏览器 */
 #fs-crumb { font-size: 12px; font-family: monospace; word-break: break-all; }
+.fs-actions { display: flex; gap: 6px; flex-shrink: 0; margin-left: 8px; }
+.fs-actions .btn { padding: 4px 8px; font-size: 12px; }
 .fs-row {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 6px; border-bottom: 1px solid var(--line);
@@ -125,6 +127,14 @@ body {
 .fs-dir { color: var(--accent); }
 .fs-name { flex: 1; word-break: break-all; }
 .fs-size { color: var(--dim); font-size: 12px; flex-shrink: 0; }
+.fs-row-btns { display: flex; gap: 6px; flex-shrink: 0; }
+.fs-copy {
+  flex-shrink: 0; background: var(--card2); color: var(--dim);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 5px 8px; font-size: 13px; cursor: pointer;
+}
+.fs-copy:active { transform: scale(0.94); }
+.fs-copy.copied { color: var(--green); border-color: var(--green); }
 #fs-preview {
   margin-top: 12px; padding: 12px; background: var(--toolbg);
   border: 1px solid var(--line); border-radius: 10px;

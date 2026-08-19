@@ -81,8 +81,13 @@
     <section class="card">
       <div class="card-title">
         <span id="fs-crumb">文件系统</span>
-        <button id="fs-home" class="btn small">根目录</button>
+        <span class="fs-actions">
+          <button id="fs-copy-path" class="btn small" title="复制当前路径">📋 路径</button>
+          <button id="fs-upload" class="btn small primary">⬆ 上传</button>
+          <button id="fs-home" class="btn small">根目录</button>
+        </span>
       </div>
+      <input type="file" id="fs-file-input" multiple hidden />
       <div id="fs-list"><div class="empty">加载中…</div></div>
       <pre id="fs-preview" class="mono" hidden></pre>
     </section>
