@@ -18,3 +18,8 @@ android-app/build/
 android-app/app/build/
 android-app/local.properties
 *.apk
+
+# 便携版打包产物
+build-portable/dist/
+build-portable/*.zip
+build-portable/node-*.zip
