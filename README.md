@@ -34,26 +34,36 @@
 
 关系：`手机 ⇄ 网关（电脑上） ⇄ DSH（电脑上）`。网关是手机和 DSH 之间的"翻译官"。
 
-### 第 1 步：电脑准备
+### 第 1 步：获取网关（二选一）
 
-**1.1 安装 Node.js（若已装可跳过）**
+**方式 A（推荐新手）：下载便携版——不用安装 Node.js**
+
+1. 下载 **`dsh-mobile-portable.zip`**（内置了 Node.js 运行时和全部文件，约 36 MB）
+2. 解压到电脑任意文件夹（比如 `D:\dsh-mobile`）
+3. 完成——**不需要**单独安装 Node.js
+
+> 便携版由项目自带的打包脚本生成（见文末「目录结构」中的 `build-portable/`），功能与源码版完全一致。
+
+**方式 B（开发者）：源码方式**
+
+**B.1 安装 Node.js（若已装可跳过）**
 1. 打开 https://nodejs.org/ ，下载 **LTS 版**（推荐 ≥ 22，本项目要求 ≥ 21）
 2. 双击安装包，一路"下一步"即可
 3. 验证是否装好：按 `Win+R` → 输入 `cmd` 回车 → 输入 `node -v` 回车 → 看到 `v24.x.x` 之类的版本号即成功
 
-**1.2 确认 DSH 已安装并正在运行**
+**B.2 确认 DSH 已安装并正在运行**
 - 打开 DSH Desktop，能看到对话界面即可（网关会自动找到它）
 
-**1.3 获取本项目代码**（二选一）
-- **方式 A（推荐，有 git）**：打开命令行，运行
+**B.3 获取本项目代码**（二选一）
+- **有 git**：打开命令行，运行
   ```
   git clone https://github.com/Matrix2097/dsh-mobile.git
   ```
-- **方式 B（没有 git）**：浏览器打开仓库页面 → 绿色 **Code** 按钮 → **Download ZIP** → 解压到任意文件夹
+- **没有 git**：浏览器打开仓库页面 → 绿色 **Code** 按钮 → **Download ZIP** → 解压到任意文件夹
 
 ### 第 2 步：启动网关（电脑端）
 
-**2.1** 进入解压/克隆出来的 `dsh-mobile` 文件夹，**双击 `start-gateway.bat`**
+**2.1** 进入第 1 步解压出来的文件夹，**双击 `start-gateway.bat`**（便携版与源码版都是这个文件）
 
 **2.2** 首次运行，Windows 会弹"防火墙"提示 → 勾选「专用网络」→ 点「允许访问」（只需一次）
 
@@ -168,6 +178,23 @@ gradle assembleDebug
 # 产物：app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## 便携版打包（进阶：自行生成免安装 zip）
+
+> 新手直接用现成的 `dsh-mobile-portable.zip` 即可。以下仅供更新代码后自己重新打包时参考。
+
+前置：需要一台装了 Node.js 的电脑（打包机）。
+
+```powershell
+# 1. 下载内置 Node 运行时（npmmirror 国内镜像）
+node build-portable/download-node.mjs
+
+# 2. 打包（自动组装 dist/ 并压缩为 dsh-mobile-portable.zip）
+powershell -ExecutionPolicy Bypass -File build-portable/build-portable.ps1
+# 产物：build-portable/dsh-mobile-portable.zip（约 36 MB）
+```
+
+产物 zip 解压到任意 Windows 电脑 → 双击 `start-gateway.bat` 即可运行（内置 Node，无需安装）。
+
 ### 安装与使用
 
 1. 将 `app-debug.apk` 传到手机安装（允许"未知来源"）
@@ -236,6 +263,7 @@ dsh-mobile/
 ├── start-gateway.bat    # 双击入口
 ├── package.json         # 零依赖
 ├── public/              # PWA 前端（网关运行必需，勿删：手机访问网关时从这里加载页面）
+├── build-portable/      # 便携版打包脚本（内置 Node 运行时，产出免安装 zip）
 └── android-app/         # Android App（WebView 壳 + 前台服务）
     ├── app/src/main/java/com/matrix/dshmonitor/
     │   ├── MainActivity.kt      # 配置 + WebView（自动注入配置到 PWA）
