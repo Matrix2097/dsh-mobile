@@ -4,7 +4,7 @@ import fs from "node:fs";
 const TOKEN = process.env.GH_TOKEN;
 const OWNER = "Matrix2097";
 const REPO = "dsh-mobile";
-const TAG = "v1.0.0";
+const TAG = "v1.1.0";
 const API = "https://api.github.com";
 const H = {
   Authorization: `token ${TOKEN}`,
@@ -21,13 +21,13 @@ async function api(path, opts = {}) {
   return json;
 }
 
-const BODY = `# DSH 手机监管 v1.0.0
+const BODY = `# DSH 手机监管 v1.1.0
 
-在手机上实时监管电脑上的 **DeepSeek Harness**：任务进度实时监控、流式对话、模型/权限切换、任务完成/审批/出错提醒、只读文件浏览。支持 PWA 与 Android App（常驻后台）两种形态。
+在手机上实时监管电脑上的 **DeepSeek Harness**：任务进度实时监控、流式对话、模型/权限切换、任务完成/审批/出错提醒、可视化浏览**电脑全部磁盘**、**手机文件直接上传到电脑**。支持 PWA 与 Android App（常驻后台）两种形态。
 
 ## 📦 下载
 
-- **Android App**（常驻后台 + 任务提醒）：\`app-debug.apk\`（Android 8.0+）
+- **Android App**（常驻后台 + 任务提醒 + 文件上传）：\`app-debug.apk\`（Android 8.0+）
 - **电脑端便携版**（免装 Node.js）：\`dsh-mobile-portable.zip\`（解压 → 双击 \`start-gateway.bat\` 即用）
 
 ## ✨ 功能
@@ -36,7 +36,12 @@ const BODY = `# DSH 手机监管 v1.0.0
 - 流式对话：思考/回复逐字流式，思考与工具折叠
 - Slash 命令：输入框 \`/\` 开头自动走命令通道
 - 模型切换 / 权限切换（只读/工作区/完全访问）
-- 审批应答、任务提醒、只读文件浏览
+- 审批应答、任务提醒
+- **文件系统 v2**（v1.1 新增）：
+  - 浏览电脑**全部磁盘**（默认全盘，可选白名单收窄）
+  - 文本预览、下载到手机
+  - **一键复制完整文件路径**
+  - **手机文件直接上传到电脑任意目录**（多选 + 进度/结果提示）
 - Android 前台服务：锁屏/后台也能推送提醒
 - 深色/浅色主题
 
