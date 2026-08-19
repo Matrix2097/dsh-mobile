@@ -688,7 +688,14 @@ async function interruptSession(sessionId) {
 }
 
 // ---------- 文件浏览 ----------
-let fsEntries = []; // 当前列表缓存（供复制路径用）
+let fsEntries = [];   // 当前列表缓存（供复制路径用）
+let fsQuickPaths = []; // 常用目录快捷入口缓存（onclick 走索引，避免路径引号问题）
+
+/** 点击常用目录快捷按钮（如 桌面/下载） */
+function fsQuickGo(i) {
+  const q = fsQuickPaths[i];
+  if (q) fsOpen(q.path);
+}
 
 /** 判断是否为隐藏项（Windows 点开头 / 常见系统隐藏目录） */
 function isHiddenName(name) {
@@ -710,8 +717,9 @@ async function fsOpen(p) {
       if (qr.ok) {
         const qd = await qr.json();
         if (qd?.length) {
+          fsQuickPaths = qd;
           quick.hidden = false;
-          quick.innerHTML = qd.map((q) => `<button class="fs-quick-btn" onclick="fsOpen(${JSON.stringify(q.path)})">📍 ${esc(q.name)}</button>`).join("");
+          quick.innerHTML = qd.map((q, i) => `<button class="fs-quick-btn" onclick="fsQuickGo(${i})">📍 ${esc(q.name)}</button>`).join("");
         }
       }
     } catch { /* 快捷入口加载失败不阻塞 */ }
