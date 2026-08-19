@@ -38,7 +38,8 @@
 
 **方式 A（推荐新手）：下载便携版——不用安装 Node.js**
 
-1. 下载 **`dsh-mobile-portable.zip`**（内置了 Node.js 运行时和全部文件，约 36 MB）
+1. 下载 **`dsh-mobile-portable.zip`**（内置了 Node.js 运行时和全部文件，约 36 MB）：
+   👉 [GitHub Releases 下载](https://github.com/Matrix2097/dsh-mobile/releases/latest/download/dsh-mobile-portable.zip)
 2. 解压到电脑任意文件夹（比如 `D:\dsh-mobile`）
 3. 完成——**不需要**单独安装 Node.js
 
@@ -104,7 +105,9 @@
 
 ### 第 5 步（可选）：Android App 方式（支持后台提醒）
 
-1. 获取 APK：下载构建好的 `app-debug.apk`（或按下方「Android App（进阶）」章节自行构建）——要求 Android 8.0+ 系统
+1. 获取 APK：下载 **`app-debug.apk`**（要求 Android 8.0+）：
+   👉 [GitHub Releases 下载](https://github.com/Matrix2097/dsh-mobile/releases/latest/download/app-debug.apk)
+   （或按下方「Android App（进阶）」章节自行构建）
 2. APK 传到手机（微信/网盘/数据线）→ 点击安装 → 允许"未知来源"
 3. 打开 App → 填和第 3.3 步相同的三项 → 「连接并启动后台监控」
 4. 通知栏出现"DSH 监控运行中" = 后台服务生效，**锁屏/切后台也能收到任务通知**
@@ -263,7 +266,7 @@ dsh-mobile/
 ├── start-gateway.bat    # 双击入口
 ├── package.json         # 零依赖
 ├── public/              # PWA 前端（网关运行必需，勿删：手机访问网关时从这里加载页面）
-├── build-portable/      # 便携版打包脚本（内置 Node 运行时，产出免安装 zip）
+├── build-portable/      # 便携版打包脚本（build-portable.ps1 / download-node.mjs / release.mjs）
 └── android-app/         # Android App（WebView 壳 + 前台服务）
     ├── app/src/main/java/com/matrix/dshmonitor/
     │   ├── MainActivity.kt      # 配置 + WebView（自动注入配置到 PWA）
