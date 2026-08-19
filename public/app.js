@@ -690,12 +690,32 @@ async function interruptSession(sessionId) {
 // ---------- 文件浏览 ----------
 let fsEntries = []; // 当前列表缓存（供复制路径用）
 
+/** 判断是否为隐藏项（Windows 点开头 / 常见系统隐藏目录） */
+function isHiddenName(name) {
+  return typeof name === "string" && (name.startsWith(".") || /^(AppData|ProgramData|System Volume Information|\$RECYCLE\.BIN)$/.test(name));
+}
+
 async function fsOpen(p) {
   if (!api) return;
   fsPath = p || "";
   $("fs-preview").hidden = true;
   const list = $("fs-list");
   list.innerHTML = `<div class="empty">加载中…</div>`;
+  // 盘符层（未限制且空路径）显示常用目录快捷入口
+  const quick = $("fs-quick");
+  quick.hidden = true;
+  if (!fsPath) {
+    try {
+      const qr = await fetch(`${api.base}/fs/quick`, { headers: { "x-gateway-token": api.token } });
+      if (qr.ok) {
+        const qd = await qr.json();
+        if (qd?.length) {
+          quick.hidden = false;
+          quick.innerHTML = qd.map((q) => `<button class="fs-quick-btn" onclick="fsOpen(${JSON.stringify(q.path)})">📍 ${esc(q.name)}</button>`).join("");
+        }
+      }
+    } catch { /* 快捷入口加载失败不阻塞 */ }
+  }
   try {
     const res = await fetch(`${api.base}/fs/list?path=${encodeURIComponent(fsPath)}`, { headers: { "x-gateway-token": api.token } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -703,8 +723,12 @@ async function fsOpen(p) {
     fsEntries = data.entries ?? [];
     $("fs-crumb").textContent = data.path || (data.drives ? "全部磁盘" : "文件系统");
     $("fs-crumb").title = data.path || "";
+    // 上一级按钮可用性
+    $("fs-up").disabled = !fsPath && !data.drives;
     list.innerHTML = fsEntries.length
-      ? fsEntries.map((e, i) => `<div class="fs-row" onclick="fsTap(${i})">
+      ? fsEntries.map((e, i) => {
+          const hidden = isHiddenName(e.name);
+          return `<div class="fs-row ${hidden ? "fs-hidden" : ""}" onclick="fsTap(${i})">
           <span class="fs-icon ${e.type === "dir" ? "fs-dir" : ""}">${e.drive ? "💽" : e.type === "dir" ? "📁" : "📄"}</span>
           <span class="fs-name">${esc(e.drive ? e.name : e.name)}</span>
           <span class="fs-size">${e.type === "dir" ? "" : fmtSize(e.size)}</span>
@@ -712,11 +736,54 @@ async function fsOpen(p) {
             ${e.type === "file" ? `<button class="fs-copy" onclick="event.stopPropagation(); fsDownload(${i})" title="下载到手机">⬇</button>` : ""}
             <button class="fs-copy" onclick="event.stopPropagation(); fsCopyPath(${i})" title="复制完整路径">📋</button>
           </span>
-        </div>`).join("")
+        </div>`;
+        }).join("")
       : `<div class="empty">空目录</div>`;
   } catch (err) {
     fsEntries = [];
     list.innerHTML = `<div class="empty">加载失败：${esc(err.message)}</div>`;
+  }
+}
+
+/** 返回上一级（盘符层再上级 = 快捷入口层） */
+async function fsUp() {
+  if (!api) return;
+  try {
+    const res = await fetch(`${api.base}/fs/parent?path=${encodeURIComponent(fsPath)}`, { headers: { "x-gateway-token": api.token } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+    if (data.drives) fsOpen(""); // 回到盘符层
+    else fsOpen(data.path);
+  } catch (err) {
+    toast("返回上一级失败：" + err.message);
+  }
+}
+
+/** 输入路径直达 */
+async function fsGoto() {
+  if (!api) return;
+  const input = $("fs-path-input");
+  const p = input.value.trim();
+  if (!p) { toast("请输入路径"); return; }
+  // 路径清洗：反斜杠、首尾空格
+  const clean = p.replace(/^["']|["']$/g, "");
+  const res = await fetch(`${api.base}/fs/list?path=${encodeURIComponent(clean)}`, { headers: { "x-gateway-token": api.token } });
+  if (res.ok) {
+    fsOpen(clean);
+    $("fs-goto-row").hidden = true;
+    toast("已跳转：" + clean);
+  } else {
+    const data = await res.json().catch(() => ({}));
+    toast("路径无效：" + (data.error ?? res.status));
+  }
+}
+
+function fsToggleGoto() {
+  const row = $("fs-goto-row");
+  row.hidden = !row.hidden;
+  if (!row.hidden) {
+    $("fs-path-input").value = fsPath || "";
+    $("fs-path-input").focus();
   }
 }
 
@@ -884,7 +951,13 @@ $("btn-connect").addEventListener("click", () => {
 });
 $("btn-notify").addEventListener("click", enableNotifications);
 $("fs-home").addEventListener("click", () => fsOpen(""));
-$("fs-copy-path").addEventListener("click", fsCopyCurrent);
+$("fs-up").addEventListener("click", fsUp);
+$("fs-goto").addEventListener("click", fsToggleGoto);
+$("fs-goto-go").addEventListener("click", fsGoto);
+$("fs-path-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); fsGoto(); }
+});
+$("fs-copy-path")?.addEventListener("click", fsCopyCurrent);
 $("fs-upload").addEventListener("click", () => $("fs-file-input").click());
 $("fs-file-input").addEventListener("change", (e) => {
   fsUploadFiles(e.target.files);

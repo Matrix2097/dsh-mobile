@@ -82,11 +82,17 @@
       <div class="card-title">
         <span id="fs-crumb">文件系统</span>
         <span class="fs-actions">
-          <button id="fs-copy-path" class="btn small" title="复制当前路径">📋 路径</button>
+          <button id="fs-up" class="btn small" title="返回上一级">⬆ 上级</button>
+          <button id="fs-goto" class="btn small" title="输入路径直达">🔍 路径</button>
           <button id="fs-upload" class="btn small primary">⬆ 上传</button>
           <button id="fs-home" class="btn small">根目录</button>
         </span>
       </div>
+      <div id="fs-goto-row" hidden>
+        <input id="fs-path-input" type="text" placeholder="输入完整路径，如 C:\Users\Lenovo\Desktop" autocomplete="off" />
+        <button id="fs-goto-go" class="btn small primary">前往</button>
+      </div>
+      <div id="fs-quick" class="fs-quick" hidden></div>
       <input type="file" id="fs-file-input" multiple hidden />
       <div id="fs-list"><div class="empty">加载中…</div></div>
       <pre id="fs-preview" class="mono" hidden></pre>

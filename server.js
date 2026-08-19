@@ -287,6 +287,53 @@ async function listDrives() {
   return drives;
 }
 
+/** 常用目录快捷入口（桌面/下载/文档/图片/视频/音乐/用户目录/盘符） */
+async function fsQuick() {
+  const items = [];
+  const add = (name, p) => {
+    try {
+      if (fs.existsSync(p)) items.push({ name, path: p });
+    } catch { /* noop */ }
+  };
+  const home = process.env.USERPROFILE || process.env.HOME || null;
+  if (process.platform === "win32") {
+    if (home) {
+      // OneDrive 可能接管桌面
+      add("桌面", path.join(home, "OneDrive", "Desktop"));
+      add("桌面", path.join(home, "Desktop"));
+      add("下载", path.join(home, "Downloads"));
+      add("文档", path.join(home, "Documents"));
+      add("图片", path.join(home, "Pictures"));
+      add("视频", path.join(home, "Videos"));
+      add("音乐", path.join(home, "Music"));
+      add("用户目录", home);
+    }
+    for (let i = 65; i <= 90; i++) {
+      const d = `${String.fromCharCode(i)}:\\`;
+      try {
+        fs.accessSync(d);
+        items.push({ name: d, path: d });
+      } catch { /* noop */ }
+    }
+  } else if (home) {
+    add("主目录", home);
+    add("根目录", "/");
+  }
+  return items;
+}
+
+/** 计算上一级目录（盘符根再上一级 = 盘符列表 ""；白名单模式下停在白名单根） */
+function fsParent(p) {
+  const abs = resolvePath(String(p ?? ""));
+  const parent = path.dirname(abs);
+  if (root) {
+    if (parent === root || parent.startsWith(root + path.sep)) return { path: parent };
+    return { path: root, atRoot: true }; // 越界 → 停在白名单根
+  }
+  if (parent === abs) return { path: "", drives: true }; // 盘符根
+  return { path: parent };
+}
+
 const TEXT_EXT = new Set([".txt", ".md", ".json", ".js", ".ts", ".jsx", ".tsx", ".css", ".html", ".htm", ".xml", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".log", ".csv", ".ps1", ".py", ".c", ".h", ".cpp", ".java", ".go", ".rs", ".sh", ".bat", ".cmd", ".vue", ".svelte", ".sql", ".env"]);
 
 async function fsList(p) {
@@ -537,6 +584,8 @@ const server = http.createServer(async (req, res) => {
         }
         if (req.method !== "GET") return sendJson(res, 405, { ok: false, error: "method not allowed" });
         if (p === "/fs/list") return sendJson(res, 200, await fsList(url.searchParams.get("path") ?? ""));
+        if (p === "/fs/quick") return sendJson(res, 200, await fsQuick());
+        if (p === "/fs/parent") return sendJson(res, 200, fsParent(url.searchParams.get("path") ?? ""));
         if (p === "/fs/read") return sendJson(res, 200, await fsRead(url.searchParams.get("path") ?? ""));
         if (p === "/fs/download") {
           const abs = resolvePath(url.searchParams.get("path") ?? "");

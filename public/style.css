@@ -135,6 +135,26 @@ body {
 }
 .fs-copy:active { transform: scale(0.94); }
 .fs-copy.copied { color: var(--green); border-color: var(--green); }
+/* 隐藏项（点开头 / 系统目录）半透明显示，但保留在列表中 */
+.fs-hidden { opacity: 0.55; }
+.fs-hidden .fs-name::after { content: " ·"; color: var(--dim); }
+
+/* 常用目录快捷入口 */
+.fs-quick {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 8px 0 10px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.fs-quick-btn {
+  background: var(--card2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 6px 12px; font-size: 12px; cursor: pointer;
+}
+.fs-quick-btn:active { transform: scale(0.96); border-color: var(--accent); }
+
+/* 路径输入行 */
+#fs-goto-row { display: flex; gap: 8px; margin-bottom: 8px; }
+#fs-goto-row input { flex: 1; margin-top: 0; }
 #fs-preview {
   margin-top: 12px; padding: 12px; background: var(--toolbg);
   border: 1px solid var(--line); border-radius: 10px;
