@@ -1,5 +1,5 @@
 // sw.js — 离线壳 + 通知点击（network-first：改版即时生效，离线回退缓存）
-const CACHE = "dshm-v2";
+const CACHE = "dshm-v3";
 const STATIC = ["/", "/index.html", "/app.js", "/style.css", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (e) => {
